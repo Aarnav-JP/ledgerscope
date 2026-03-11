@@ -8,15 +8,25 @@ interface MetricCardProps {
 }
 
 export default function MetricCard({ label, value, delta, positive }: MetricCardProps) {
-  let valueColor = "text-accent";
-  if (positive === false) valueColor = "text-negative";
-  if (positive === null) valueColor = "text-text";
+  let valueColor = "text-[var(--accent)]";
+  if (positive === false) valueColor = "text-[var(--negative)]";
+  if (positive === null) valueColor = "text-[var(--text)]";
 
   return (
-    <div className="bg-surface border border-border p-4 sm:p-5 rounded-none flex flex-col justify-center">
-      <span className="font-mono text-[10px] uppercase text-text-muted mb-2 block truncate">{label}</span>
-      <span className={`font-mono text-xl sm:text-2xl tracking-tighter break-words ${valueColor}`}>{value}</span>
-      {delta && <span className="font-sans text-xs text-text-dim mt-2 truncate">{delta}</span>}
+    <div className="glass-card p-5 flex flex-col justify-between min-h-[100px] group">
+      <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-3 block">
+        {label}
+      </span>
+      <div>
+        <span className={`font-mono text-2xl tracking-tight ${valueColor} transition-colors`}>
+          {value}
+        </span>
+        {delta && (
+          <span className={`block font-sans text-xs mt-2 ${positive === false ? 'text-[var(--negative)]' : 'text-[var(--text-dim)]'}`}>
+            {delta}
+          </span>
+        )}
+      </div>
     </div>
   );
 }

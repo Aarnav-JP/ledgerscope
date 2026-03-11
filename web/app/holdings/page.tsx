@@ -15,7 +15,6 @@ export default function HoldingsPage() {
           fetchPnL()
         ]);
 
-        // Get latest P&L record for each symbol
         const latestPnl: Record<string, any> = {};
         pnlHistory.forEach((record: any) => {
           if (!latestPnl[record.symbol] || record.date > latestPnl[record.symbol].date) {
@@ -43,40 +42,70 @@ export default function HoldingsPage() {
     loadData();
   }, []);
 
-  if (loading) return <div className="text-text-dim mt-10 text-center animate-pulse">Loading holdings...</div>;
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="h-12 loading-shimmer rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+
+  const totalValue = holdings.reduce((sum, h) => sum + h.market_value, 0);
+  const totalPnl = holdings.reduce((sum, h) => sum + h.unrealized_pnl, 0);
 
   return (
     <main>
-      <h1 className="text-2xl text-accent font-serif italic mb-6">Current Positions</h1>
+      <div className="flex items-baseline justify-between mb-8">
+        <h1 className="section-heading font-sans text-2xl font-semibold text-[var(--text)]">
+          Current Positions
+        </h1>
+        <div className="text-right">
+          <span className="font-mono text-xs text-[var(--text-muted)] uppercase block">Total Value</span>
+          <span className="font-mono text-lg text-[var(--text)]">
+            ${totalValue.toLocaleString(undefined, {minimumFractionDigits: 2})}
+          </span>
+          <span className={`font-mono text-xs ml-2 ${totalPnl >= 0 ? 'text-[var(--accent)]' : 'text-[var(--negative)]'}`}>
+            {totalPnl >= 0 ? '+' : ''}${totalPnl.toLocaleString(undefined, {minimumFractionDigits: 2})}
+          </span>
+        </div>
+      </div>
       
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+        <table className="data-table">
           <thead>
             <tr>
-              <th className="border border-border bg-surface2 p-3 font-sans text-xs uppercase text-text-dim">Symbol</th>
-              <th className="border border-border bg-surface2 p-3 font-sans text-xs uppercase text-text-dim text-right">Shares</th>
-              <th className="border border-border bg-surface2 p-3 font-sans text-xs uppercase text-text-dim text-right">Avg Cost</th>
-              <th className="border border-border bg-surface2 p-3 font-sans text-xs uppercase text-text-dim text-right">Current Price</th>
-              <th className="border border-border bg-surface2 p-3 font-sans text-xs uppercase text-text-dim text-right">Market Value</th>
-              <th className="border border-border bg-surface2 p-3 font-sans text-xs uppercase text-text-dim text-right">Unrealized P&L</th>
+              <th className="text-left">Symbol</th>
+              <th className="text-right">Shares</th>
+              <th className="text-right">Avg Cost</th>
+              <th className="text-right">Current Price</th>
+              <th className="text-right">Market Value</th>
+              <th className="text-right">Unrealized P&L</th>
             </tr>
           </thead>
           <tbody>
-            {holdings.map((h, i) => (
-              <tr key={h.symbol} className={i % 2 === 0 ? "bg-surface" : "bg-surface2"}>
-                <td className="border border-border p-3 font-mono">{h.symbol}</td>
-                <td className="border border-border p-3 font-mono text-right">{h.shares.toFixed(4)}</td>
-                <td className="border border-border p-3 font-mono text-right">${h.avg_cost.toFixed(2)}</td>
-                <td className="border border-border p-3 font-mono text-right">${h.current_price.toFixed(2)}</td>
-                <td className="border border-border p-3 font-mono text-right">${h.market_value.toFixed(2)}</td>
-                <td className={`border border-border p-3 font-mono text-right ${h.unrealized_pnl >= 0 ? 'text-accent' : 'text-negative'}`}>
-                  ${h.unrealized_pnl.toFixed(2)}
-                </td>
-              </tr>
-            ))}
+            {holdings.map((h) => {
+              const pnlPct = h.avg_cost > 0 ? ((h.current_price - h.avg_cost) / h.avg_cost * 100) : 0;
+              return (
+                <tr key={h.symbol}>
+                  <td className="font-semibold text-[var(--accent)]">{h.symbol}</td>
+                  <td className="text-right">{h.shares.toFixed(4)}</td>
+                  <td className="text-right">${h.avg_cost.toFixed(2)}</td>
+                  <td className="text-right">${h.current_price.toFixed(2)}</td>
+                  <td className="text-right">${h.market_value.toFixed(2)}</td>
+                  <td className={`text-right ${h.unrealized_pnl >= 0 ? 'text-[var(--accent)]' : 'text-[var(--negative)]'}`}>
+                    ${h.unrealized_pnl.toFixed(2)}
+                    <span className="text-[var(--text-muted)] text-[11px] ml-1">
+                      ({pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%)
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
             {holdings.length === 0 && (
               <tr>
-                <td colSpan={6} className="border border-border p-3 text-center text-text-dim">No holdings found.</td>
+                <td colSpan={6} className="text-center text-[var(--text-muted)] py-8">No holdings found.</td>
               </tr>
             )}
           </tbody>

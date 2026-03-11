@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { fetchSummary, fetchPnL, fetchHoldings } from '@/lib/api';
 import MetricCard from '@/components/MetricCard';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Area, AreaChart } from 'recharts';
 
 export default function OverviewPage() {
   const [summary, setSummary] = useState<any>(null);
@@ -22,16 +22,33 @@ export default function OverviewPage() {
         setSummary(sumData);
         setHoldings(holdData);
         
-        // Aggregate PnL by date for the portfolio value chart
+        // Aggregate market value by date, tracking symbol count per date
         const valueByDate: Record<string, number> = {};
+        const symbolsByDate: Record<string, Set<string>> = {};
+        const allSymbols = new Set<string>();
+
         pnlData.forEach((record: any) => {
-          if (!valueByDate[record.date]) valueByDate[record.date] = 0;
+          if (!valueByDate[record.date]) {
+            valueByDate[record.date] = 0;
+            symbolsByDate[record.date] = new Set();
+          }
           valueByDate[record.date] += record.market_value;
+          symbolsByDate[record.date].add(record.symbol);
+          allSymbols.add(record.symbol);
         });
-        
-        const chartData = Object.keys(valueByDate).sort().map(date => ({
+
+        // Keep only dates where at least 80% of symbols have data (filters out partial days)
+        const minSymbols = Math.max(1, Math.ceil(allSymbols.size * 0.8));
+        const validDates = Object.keys(valueByDate)
+          .filter(date => (symbolsByDate[date]?.size || 0) >= minSymbols)
+          .sort();
+
+        // Sample weekly for a smoother chart (every 5th trading day)
+        const sampledDates = validDates.filter((_, i) => i % 5 === 0 || i === validDates.length - 1);
+
+        const chartData = sampledDates.map(date => ({
           date,
-          value: valueByDate[date]
+          value: Math.round(valueByDate[date] * 100) / 100,
         }));
         
         setPnL(chartData);
@@ -44,21 +61,42 @@ export default function OverviewPage() {
     loadData();
   }, []);
 
-  if (loading) return <div className="text-text-dim mt-10 text-center animate-pulse">Loading overview...</div>;
-  if (!summary) return <div className="text-negative mt-10">Error loading data. Is the backend running?</div>;
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="glass-card p-5 h-[100px] loading-shimmer" />
+          ))}
+        </div>
+        <div className="glass-card h-[380px] loading-shimmer" />
+      </div>
+    );
+  }
+
+  if (!summary) {
+    return (
+      <div className="glass-card p-10 text-center mt-10">
+        <p className="text-[var(--negative)] font-mono text-sm">Error loading data. Is the API server running?</p>
+        <p className="text-[var(--text-muted)] font-mono text-xs mt-2">Run: ledgerscope serve</p>
+      </div>
+    );
+  }
 
   return (
     <main>
-      <h1 className="text-2xl text-accent font-serif italic mb-6">Portfolio Overview</h1>
+      <h1 className="section-heading font-sans text-2xl font-semibold text-[var(--text)] mb-8">
+        Portfolio Overview
+      </h1>
       
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <MetricCard 
           label="Total Value" 
           value={`$${summary.total_value.toLocaleString(undefined, {minimumFractionDigits: 2})}`} 
           positive={null} 
         />
         <MetricCard 
-          label="Total Cost Basis" 
+          label="Cost Basis" 
           value={`$${summary.total_cost.toLocaleString(undefined, {minimumFractionDigits: 2})}`} 
           positive={null} 
         />
@@ -75,46 +113,85 @@ export default function OverviewPage() {
         />
       </div>
 
-      <div className="bg-surface border border-border p-6 mb-8 h-96">
-        <h2 className="text-lg font-mono text-text-dim uppercase mb-4">Portfolio Value Over Time</h2>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={pnl}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-            <XAxis dataKey="date" stroke="var(--text-dim)" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis stroke="var(--text-dim)" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `$${val.toLocaleString()}`} />
-            <Tooltip 
-              contentStyle={{ backgroundColor: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}
-              itemStyle={{ color: 'var(--accent)' }}
-              formatter={(value: number) => [`$${value.toLocaleString(undefined, {minimumFractionDigits: 2})}`, 'Value']}
-            />
-            <Line type="monotone" dataKey="value" stroke="var(--accent)" strokeWidth={2} dot={false} />
-          </LineChart>
-        </ResponsiveContainer>
+      {/* Portfolio Value Chart */}
+      <div className="glass-card p-6 mb-8">
+        <h2 className="font-mono text-xs uppercase tracking-wider text-[var(--text-muted)] mb-5">Portfolio Value Over Time</h2>
+        <div className="h-[320px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={pnl}>
+              <defs>
+                <linearGradient id="valueGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.25} />
+                  <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis 
+                dataKey="date" 
+                stroke="var(--text-muted)" 
+                fontSize={11} 
+                fontFamily="var(--font-ibm-mono)"
+                tickLine={false} 
+                axisLine={false} 
+              />
+              <YAxis 
+                stroke="var(--text-muted)" 
+                fontSize={11} 
+                fontFamily="var(--font-ibm-mono)"
+                tickLine={false} 
+                axisLine={false} 
+                tickFormatter={(val) => `$${val.toLocaleString()}`}
+                width={80}
+              />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: 'var(--surface2)', 
+                  border: '1px solid var(--border-bright)', 
+                  borderRadius: '8px',
+                  color: 'var(--text)',
+                  fontFamily: 'var(--font-ibm-mono)',
+                  fontSize: '12px',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+                }}
+                formatter={(value: number) => [`$${value.toLocaleString(undefined, {minimumFractionDigits: 2})}`, 'Value']}
+              />
+              <Area 
+                type="monotone" 
+                dataKey="value" 
+                stroke="var(--accent)" 
+                strokeWidth={2} 
+                fill="url(#valueGradient)" 
+                dot={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
       </div>
       
-      <h2 className="text-lg font-mono text-text-dim uppercase mb-4">Top Holdings</h2>
+      {/* Top Holdings Table */}
+      <h2 className="font-mono text-xs uppercase tracking-wider text-[var(--text-muted)] mb-4">Top Holdings</h2>
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+        <table className="data-table">
           <thead>
             <tr>
-              <th className="border border-border bg-surface2 p-3 font-sans text-xs uppercase text-text-dim">Symbol</th>
-              <th className="border border-border bg-surface2 p-3 font-sans text-xs uppercase text-text-dim text-right">Shares</th>
-              <th className="border border-border bg-surface2 p-3 font-sans text-xs uppercase text-text-dim text-right">Avg Cost</th>
-              <th className="border border-border bg-surface2 p-3 font-sans text-xs uppercase text-text-dim text-right">Last Trade</th>
+              <th className="text-left">Symbol</th>
+              <th className="text-right">Shares</th>
+              <th className="text-right">Avg Cost</th>
+              <th className="text-right">Last Trade</th>
             </tr>
           </thead>
           <tbody>
-            {holdings.slice(0, 5).map((h, i) => (
-              <tr key={h.symbol} className={i % 2 === 0 ? "bg-surface" : "bg-surface2"}>
-                <td className="border border-border p-3 font-mono">{h.symbol}</td>
-                <td className="border border-border p-3 font-mono text-right">{h.shares.toFixed(4)}</td>
-                <td className="border border-border p-3 font-mono text-right">${h.avg_cost.toFixed(2)}</td>
-                <td className="border border-border p-3 font-mono text-right">{h.last_trade_date}</td>
+            {holdings.slice(0, 5).map((h) => (
+              <tr key={h.symbol}>
+                <td className="font-semibold text-[var(--accent)]">{h.symbol}</td>
+                <td className="text-right">{h.shares.toFixed(4)}</td>
+                <td className="text-right">${h.avg_cost.toFixed(2)}</td>
+                <td className="text-right text-[var(--text-dim)]">{h.last_trade_date}</td>
               </tr>
             ))}
             {holdings.length === 0 && (
               <tr>
-                <td colSpan={4} className="border border-border p-3 text-center text-text-dim">No holdings found.</td>
+                <td colSpan={4} className="text-center text-[var(--text-muted)] py-8">No holdings found.</td>
               </tr>
             )}
           </tbody>
