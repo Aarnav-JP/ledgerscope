@@ -178,6 +178,6 @@ class TestAPIEndpoints:
         assert response.status_code == 400
 
     def test_report_pdf_stub(self, client):
-        """GET /api/report/pdf should return 501 (not yet implemented)."""
+        """GET /api/report/pdf should return 200 (PDF generation works)."""
         response = client.get("/api/report/pdf")
-        assert response.status_code == 501
+        assert response.status_code == 200
