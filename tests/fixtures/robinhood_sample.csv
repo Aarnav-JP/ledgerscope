@@ -1,0 +1,9 @@
+Activity Date,Instrument,Symbol,Trans Code,Quantity,Price,Amount,Description
+2023-01-03,Apple Inc,AAPL,Buy,10,150.12,-1501.20,Apple Inc Buy
+2023-01-15,Tesla Inc,TSLA,Buy,5,210.55,-1052.75,Tesla Inc Buy
+2023-02-10,Apple Inc,AAPL,Sell,4,175.40,701.60,Apple Inc Sell
+2023-03-12,Microsoft Corp,MSFT,Buy,6,289.50,-1737.00,Microsoft Corp Buy
+2023-04-05,NVIDIA Corp,NVDA,Buy,3,420.15,-1260.45,NVIDIA Corp Buy
+2023-05-18,Tesla Inc,TSLA,Sell,2,238.90,477.80,Tesla Inc Sell
+2023-07-01,Apple Inc,AAPL,Dividend,11,0.24,2.64,Apple Dividend
+2023-08-21,Alphabet Inc,GOOGL,Buy,4,128.35,-513.40,Alphabet Buy

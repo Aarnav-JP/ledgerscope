@@ -50,7 +50,7 @@ RUN apt-get update && apt-get install -y curl && \
 COPY --from=web-builder /app/web /app/web
 
 # Create a sample fake dataset and ingest it so users have data immediately
-COPY tests/fixtures/sample_zerodha.csv /app/sample.csv
+COPY tests/fixtures/zerodha_sample.csv /app/sample.csv
 # We'll write the script that ingests the sample on start, and runs the servers
 RUN echo '#!/bin/bash\n\
 # Initialize the DB if it does not exist\n\

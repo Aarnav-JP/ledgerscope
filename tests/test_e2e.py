@@ -77,20 +77,20 @@ class TestEndToEnd:
         """Ingest Zerodha CSV → verify holdings view has data."""
         parser = ZerodhaParser()
         count = parser.to_transactions(FIXTURES / "zerodha_sample.csv", full_db)
-        assert count == 10
+        assert count == 8
 
         # Check transactions table
         tx_count = full_db.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
-        assert tx_count == 10
+        assert tx_count == 8
 
         # Check holdings view
         holdings = full_db.execute("SELECT * FROM holdings").fetchall()
         assert len(holdings) > 0
 
-        # Verify known position: RELIANCE had 10 + 5 buys = 15 shares, no sells
+        # Verify known position: RELIANCE had 10 buys - 4 sells = 6 shares
         reliance = [h for h in holdings if h[0] == "RELIANCE"]
         assert len(reliance) == 1
-        assert reliance[0][1] == 15  # shares
+        assert reliance[0][1] == 6  # shares
 
     def test_risk_summary_with_prices(self, full_db):
         """Ingest → insert mock prices → verify risk_summary returns data."""
@@ -152,7 +152,7 @@ class TestEndToEnd:
         parser.to_transactions(FIXTURES / "zerodha_sample.csv", full_db)
 
         tx_count = full_db.execute("SELECT COUNT(*) FROM transactions").fetchone()[0]
-        assert tx_count == 10
+        assert tx_count == 8
 
     def test_multiple_brokers(self, full_db):
         """Import from multiple brokers into the same database."""
