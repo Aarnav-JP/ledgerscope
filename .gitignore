@@ -17,6 +17,7 @@ __pycache__/
 portfolio_report.pdf
 test.py
 *.csv
+!tests/fixtures/*.csv
 
 # UI / Node
 web/node_modules/
