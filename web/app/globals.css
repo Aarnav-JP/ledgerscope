@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: #0A0C0F;
+    --surface: #0F1217;
+    --surface2: #141820;
+    --border: #1E2430;
+    --border-bright: #2A3444;
+    --text: #C9D1DC;
+    --text-dim: #5A6478;
+    --text-muted: #3A4255;
+    --accent: #00D4AA;
+    --accent-dim: rgba(0, 212, 170, 0.12);
+    --negative: #FF4D6A;
+    --warning: #F5A623;
+    --neutral: #4D9FFF;
+  }
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+}

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LedgerScope Portfolio Report</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600;700&display=swap');
+
+        @page {
+            size: A4;
+            margin: 20mm;
+            @bottom-right {
+                content: counter(page) " of " counter(pages);
+                font-family: 'IBM Plex Mono', monospace;
+                font-size: 10pt;
+                color: #5A6478;
+            }
+        }
+
+        body {
+            font-family: 'IBM Plex Sans', sans-serif;
+            color: #1E2430;
+            background-color: #FFFFFF;
+            line-height: 1.5;
+            font-size: 10pt;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1, h2, h3 {
+            color: #00D4AA; /* Dark teal accent for print */
+            font-weight: normal;
+        }
+
+        .cover-page {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            page-break-after: always;
+        }
+
+        .cover-title {
+            font-family: 'DM Serif Display', serif;
+            font-style: italic;
+            font-size: 48pt;
+            color: #1E2430;
+            margin-bottom: 20px;
+            border-bottom: 4px solid #00D4AA;
+            padding-bottom: 10px;
+        }
+
+        .cover-date {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 14pt;
+            color: #5A6478;
+        }
+
+        .section-title {
+            font-family: 'DM Serif Display', serif;
+            font-style: italic;
+            font-size: 24pt;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #00D4AA;
+            padding-bottom: 5px;
+            color: #1E2430;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+
+        th, td {
+            border: 1px solid #1E2430;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #F8F9FA;
+            font-family: 'IBM Plex Sans', sans-serif;
+            font-weight: 600;
+            font-size: 9pt;
+            text-transform: uppercase;
+            color: #5A6478;
+        }
+
+        td {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 10pt;
+        }
+
+        .text-right { text-align: right; }
+        .text-left { text-align: left; }
+        .text-center { text-align: center; }
+
+        .positive { color: #00A383; } /* Slightly darker teal for white bg readability */
+        .negative { color: #E0314A; } /* Darker red for white bg readability */
+        .neutral { color: #1E2430; }
+
+        .chart-container {
+            margin: 30px 0;
+            text-align: center;
+        }
+        
+        .chart-container img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #1E2430;
+        }
+
+        .page-break { page-break-before: always; }
+    </style>
+</head>
+<body>
+
+    <!-- Cover Page -->
+    <div class="cover-page">
+        <div class="cover-title">Portfolio Review</div>
+        <div class="cover-date">{{ date }}</div>
+    </div>
+
+    <!-- Summary Section -->
+    <h2 class="section-title">Portfolio Summary</h2>
+    <table>
+        <tbody>
+            <tr>
+                <td class="text-left" style="font-family: 'IBM Plex Sans'; font-weight: 600;">Total Value</td>
+                <td class="text-right">{{ summary.total_value|currency }}</td>
+            </tr>
+            <tr>
+                <td class="text-left" style="font-family: 'IBM Plex Sans'; font-weight: 600;">Total Cost Basis</td>
+                <td class="text-right">{{ summary.total_cost|currency }}</td>
+            </tr>
+            <tr>
+                <td class="text-left" style="font-family: 'IBM Plex Sans'; font-weight: 600;">Total P&amp;L</td>
+                <td class="text-right {% if summary.total_pnl >= 0 %}positive{% else %}negative{% endif %}">
+                    {{ summary.total_pnl|currency }} ({{ summary.total_pnl_pct|percent }})
+                </td>
+            </tr>
+            <tr>
+                <td class="text-left" style="font-family: 'IBM Plex Sans'; font-weight: 600;">Portfolio Sharpe Ratio</td>
+                <td class="text-right">{{ "%.4f"|format(summary.portfolio_sharpe) if summary.portfolio_sharpe else 'N/A' }}</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <div class="chart-container">
+        {% if chart_base64 %}
+            <img src="{{ chart_base64 }}" alt="Portfolio Value Over Time">
+        {% else %}
+            <p>No chart data available.</p>
+        {% endif %}
+    </div>
+
+    <!-- Holdings Section -->
+    <h2 class="section-title">Current Holdings</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th class="text-right">Shares</th>
+                <th class="text-right">Avg Cost</th>
+                <th class="text-right">Current Price</th>
+                <th class="text-right">Market Value</th>
+                <th class="text-right">Unrealized P&amp;L</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for h in holdings %}
+            {% set e = enrichments[h.symbol] %}
+            <tr>
+                <td>{{ h.symbol }}</td>
+                <td class="text-right">{{ "%.4f"|format(h.shares) }}</td>
+                <td class="text-right">{{ h.avg_cost|currency }}</td>
+                <td class="text-right">{{ e.current_price|currency }}</td>
+                <td class="text-right">{{ e.market_value|currency }}</td>
+                <td class="text-right {% if e.unrealized_pnl >= 0 %}positive{% else %}negative{% endif %}">
+                    {{ e.unrealized_pnl|currency }}
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not holdings %}
+            <tr><td colspan="6" class="text-center">No current holdings.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <div class="page-break"></div>
+
+    <!-- Risk Metrics Section -->
+    <h2 class="section-title">Risk Metrics</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th class="text-right">Sharpe</th>
+                <th class="text-right">Vol (Ann)</th>
+                <th class="text-right">Return (Ann)</th>
+                <th class="text-right">Worst Day</th>
+                <th class="text-right">Max Drawdown</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rm in risk_metrics %}
+            {% set dd = drawdowns.get(rm.symbol, 0.0) %}
+            <tr>
+                <td>{{ rm.symbol }}</td>
+                <td class="text-right {% if rm.sharpe and rm.sharpe >= 0 %}positive{% elif rm.sharpe %}negative{% endif %}">
+                    {{ "%.4f"|format(rm.sharpe) if rm.sharpe else 'N/A' }}
+                </td>
+                <td class="text-right">{{ rm.annual_vol|percent if rm.annual_vol else 'N/A' }}</td>
+                <td class="text-right {% if rm.annual_return and rm.annual_return >= 0 %}positive{% elif rm.annual_return %}negative{% endif %}">
+                    {{ rm.annual_return|percent if rm.annual_return else 'N/A' }}
+                </td>
+                <td class="text-right negative">{{ rm.worst_day|percent if rm.worst_day else 'N/A' }}</td>
+                <td class="text-right negative">{{ dd|percent }}</td>
+            </tr>
+            {% endfor %}
+            {% if not risk_metrics %}
+            <tr><td colspan="6" class="text-center">No risk data available.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <!-- Benchmark Comparison Section -->
+    <h2 class="section-title">Benchmark Comparison</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th class="text-right">Correlation</th>
+                <th class="text-right">Beta</th>
+                <th class="text-right">Alpha</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for b in benchmarks %}
+            <tr>
+                <td>{{ b.symbol }}</td>
+                <td class="text-right">{{ "%.4f"|format(b.correlation) if b.correlation else 'N/A' }}</td>
+                <td class="text-right">{{ "%.4f"|format(b.beta) if b.beta else 'N/A' }}</td>
+                <td class="text-right {% if b.alpha and b.alpha >= 0 %}positive{% elif b.alpha %}negative{% endif %}">
+                    {{ "%.4f"|format(b.alpha) if b.alpha else 'N/A' }}
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not benchmarks %}
+            <tr><td colspan="4" class="text-center">No benchmark data available.</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+
+    <!-- Dividend Income Section (Conditional) -->
+    {% if dividends %}
+    <h2 class="section-title">Dividend Income</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th class="text-right">Year</th>
+                <th class="text-right">Annual Div</th>
+                <th class="text-right">Cumulative Div</th>
+                <th class="text-right">Yield on Cost</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for div in dividends %}
+            <tr>
+                <td>{{ div.symbol }}</td>
+                <td class="text-right">{{ div.year }}</td>
+                <td class="text-right positive">{{ div.annual_dividend|currency }}</td>
+                <td class="text-right positive">{{ div.cumulative_dividend|currency }}</td>
+                <td class="text-right">{{ div.yield_on_cost_pct|percent if div.yield_on_cost_pct else 'N/A' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+</body>
+</html>
