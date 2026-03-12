@@ -9,14 +9,22 @@ import pandas as pd
 from rich.console import Console
 from rich.progress import Progress
 
+from ledgerscope.config import get_config
 from ledgerscope.enrich.cache import (
     get_cache_dir,
     is_cached,
     read_cache,
     write_cache,
 )
+from ledgerscope.errors import (
+    DataFetchError,
+    ErrorContext,
+    retry_on_exception,
+)
+from ledgerscope.logging import get_logger
 
 console = Console()
+logger = get_logger(__name__)
 
 
 def _get_symbols_to_fetch(conn: duckdb.DuckDBPyConnection) -> list[dict]:
@@ -46,10 +54,18 @@ def _get_symbols_to_fetch(conn: duckdb.DuckDBPyConnection) -> list[dict]:
     return symbols
 
 
+@retry_on_exception(
+    exceptions=(Exception,),
+    on_retry=lambda e, attempt: logger.debug(f"Retry {attempt} for {yf_symbol}"),
+)
 def _download_prices(yf_symbol: str, start_date: date) -> pd.DataFrame | None:
     """Download OHLCV data from yfinance for a single symbol."""
+    config = get_config()
+    
     try:
         import yfinance as yf
+        
+        logger.info(f"Downloading prices for {yf_symbol} from {start_date}")
 
         # Fetch from a bit before the earliest trade to ensure coverage
         start = start_date - timedelta(days=30)
@@ -57,6 +73,7 @@ def _download_prices(yf_symbol: str, start_date: date) -> pd.DataFrame | None:
         hist = ticker.history(start=start.isoformat(), end=date.today().isoformat())
 
         if hist.empty:
+            logger.warning(f"No price data returned for {yf_symbol}")
             return None
 
         hist = hist.reset_index()
@@ -73,11 +90,13 @@ def _download_prices(yf_symbol: str, start_date: date) -> pd.DataFrame | None:
             df["adj_close"] = hist["Close"]
         df["volume"] = hist["Volume"].astype("int64")
         df["source"] = "yfinance"
-
+        
+        logger.info(f"Successfully fetched {len(df)} price records for {yf_symbol}")
         return df
     except Exception as e:
+        logger.error(f"Failed to fetch prices for {yf_symbol}: {e}")
         console.print(f"[yellow]Warning: Could not fetch {yf_symbol}: {e}[/]")
-        return None
+        raise DataFetchError(f"Failed to download prices for {yf_symbol}") from e
 
 
 def _insert_prices(

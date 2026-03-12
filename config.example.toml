@@ -1,0 +1,102 @@
+# Example LedgerScope Configuration
+# Copy this to ~/.ledgerscope/config.toml and customize
+
+[general]
+# Base currency for portfolio valuation and reporting
+# Supported: Any ISO 4217 currency code (USD, EUR, GBP, INR, etc.)
+base_currency = "USD"
+
+# Risk-free rate for Sharpe ratio calculations (annual percentage as decimal)
+# US Treasury 10-year yield is commonly used (~4% as of 2024)
+risk_free_rate = 0.04
+
+# Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+# DEBUG: Verbose logging for troubleshooting
+# INFO: Normal operation logging
+# WARNING: Only warnings and errors
+log_level = "INFO"
+
+# Log file name (stored in ~/.ledgerscope/)
+log_file = "ledgerscope.log"
+
+[data]
+# Number of days before cached data expires
+# 1 = refresh daily, 7 = refresh weekly
+cache_expiry_days = 1
+
+# Data source for historical prices
+# Currently supported: yfinance
+price_source = "yfinance"
+
+# Data source for macroeconomic indicators
+# Currently supported: fred (Federal Reserve Economic Data)
+macro_source = "fred"
+
+# Number of retry attempts for failed API calls
+retry_attempts = 3
+
+# Delay between retry attempts (seconds)
+retry_delay_seconds = 2
+
+# HTTP request timeout (seconds)
+request_timeout_seconds = 30
+
+[currency]
+# Automatically convert all holdings to base currency
+# Set to false if you want to keep original currencies
+auto_convert = true
+
+# Exchange rate data source
+# Supported: exchangerate-api (requires API key), frankfurter (free, EU only)
+exchange_rate_source = "exchangerate-api"
+
+# Manual exchange rate overrides (optional)
+# Use this for currencies not supported by APIs or for offline use
+# Format: "FROM_CURRENCY/TO_CURRENCY" = rate
+# Example: 1 INR = 0.012 USD means you'd set "INR/USD" = 0.012
+[currency.fallback_rates]
+# "INR/USD" = 0.012
+# "EUR/USD" = 1.08
+
+[display]
+# Date format for reports and displays
+# Python strftime format: https://strftime.org/
+date_format = "%Y-%m-%d"
+
+# Number of decimal places for currency values
+decimal_places = 2
+
+# Format for large numbers in reports
+# "abbreviated": 1.2M, 5.3K
+# "full": 1200000, 5300
+large_number_format = "abbreviated"
+
+[api_keys]
+# Optional API keys for data sources
+# Leave empty to use free tiers or manual rates
+
+# FRED API key for US macroeconomic data
+# Get your free key at: https://fred.stlouisfed.org/docs/api/api_key.html
+fred_api_key = ""
+
+# ExchangeRate-API key for exchange rates
+# Get your free key at: https://www.exchangerate-api.com/
+exchangerate_api_key = ""
+
+# ────────────────────────────────────────────────────────────────
+# NOTES:
+# ────────────────────────────────────────────────────────────────
+# 1. Environment variables override these settings
+#    Format: LEDGERSCOPE_SECTION_KEY
+#    Example: LEDGERSCOPE_GENERAL_BASE_CURRENCY=EUR
+#
+# 2. After changing config, restart ledgerscope or reload
+#
+# 3. View current configuration:
+#    ledgerscope config-show
+#
+# 4. Update configuration via CLI:
+#    ledgerscope config-set general.base_currency EUR
+#
+# 5. Log file location: ~/.ledgerscope/ledgerscope.log
+#    View logs: tail -f ~/.ledgerscope/ledgerscope.log

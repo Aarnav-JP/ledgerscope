@@ -10,6 +10,11 @@ import duckdb
 
 import threading
 
+from ledgerscope.errors import DatabaseError, ErrorContext
+from ledgerscope.logging import get_logger
+
+logger = get_logger(__name__)
+
 _connection: Optional[duckdb.DuckDBPyConnection] = None
 _local = threading.local()
 
@@ -40,14 +45,20 @@ def get_connection(db_path: Optional[Path] = None, read_only: bool = False) -> d
 
     if read_only:
         if not hasattr(_local, "conn"):
+            logger.debug(f"Creating read-only connection to {db_path}")
             _local.conn = duckdb.connect(str(db_path), read_only=True)
         return _local.conn
 
     if _connection is not None:
         return _connection
 
-    _connection = duckdb.connect(str(db_path), read_only=False)
-    return _connection
+    logger.info(f"Creating database connection to {db_path}")
+    try:
+        _connection = duckdb.connect(str(db_path), read_only=False)
+        return _connection
+    except Exception as e:
+        logger.error(f"Failed to connect to database: {e}")
+        raise DatabaseError(f"Failed to connect to database at {db_path}") from e
 
 
 def reset_connection() -> None:

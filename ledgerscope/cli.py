@@ -13,7 +13,14 @@ from rich.console import Console
 from rich.table import Table
 
 from ledgerscope import __version__
+from ledgerscope.config import init_config, get_config
 from ledgerscope.db import get_db_path, init_db, reset_connection
+from ledgerscope.logging import setup_logging, get_logger
+
+# Initialize configuration and logging
+config = init_config()
+logger = setup_logging()
+module_logger = get_logger(__name__)
 
 app = typer.Typer(
     name="ledgerscope",
@@ -100,27 +107,48 @@ def ingest(
     from ledgerscope.ingest import get_parser
     from ledgerscope.enrich.prices import fetch_prices
     from ledgerscope.enrich.macro import fetch_macro
+    from ledgerscope.currency import CurrencyConverter
+    from ledgerscope.errors import ErrorContext
 
+    module_logger.info(f"Starting ingestion of {file} as {broker} format")
+    
     if not file.exists():
         console.print(f"[red]Error:[/] File not found: {file}")
+        module_logger.error(f"File not found: {file}")
         raise typer.Exit(1)
 
-    conn = init_db()
+    with ErrorContext("database initialization", raise_on_error=True):
+        conn = init_db()
 
     # Parse and insert transactions
     console.print(f"[teal]Ingesting[/] {file.name} as [bold]{broker}[/] format...")
-    parser = get_parser(broker)
-    count = parser.to_transactions(file, conn)
-    console.print(f"[green]✓[/] Imported {count} transactions")
+    
+    with ErrorContext(f"parsing {broker} CSV file", raise_on_error=True):
+        parser = get_parser(broker)
+        count = parser.to_transactions(file, conn)
+        console.print(f"[green]✓[/] Imported {count} transactions")
+        module_logger.info(f"Imported {count} transactions from {file}")
 
     # Enrich with market data
     console.print("\n[teal]Fetching market data...[/]")
-    fetch_prices(conn, refresh=refresh)
+    with ErrorContext("fetching market prices", raise_on_error=False):
+        fetch_prices(conn, refresh=refresh)
 
     console.print("\n[teal]Fetching macro data...[/]")
-    fetch_macro(conn, refresh=refresh)
+    with ErrorContext("fetching macro data", raise_on_error=False):
+        fetch_macro(conn, refresh=refresh)
+    
+    # Fetch exchange rates if multi-currency support is enabled
+    config = get_config()
+    if config.auto_convert_currency:
+        console.print("\n[teal]Fetching exchange rates...[/]")
+        with ErrorContext("fetching exchange rates", raise_on_error=False):
+            converter = CurrencyConverter(conn, config.base_currency)
+            converter.fetch_all_portfolio_currencies(force_refresh=refresh)
+            console.print(f"[green]✓[/] Exchange rates updated (base: {config.base_currency})")
 
     console.print("\n[green]✓ Done![/] Run [bold]ledgerscope query 'SELECT * FROM risk_summary'[/] to see your risk metrics.")
+    module_logger.info("Ingestion completed successfully")
 
 
 # ── Query ────────────────────────────────────────────────────────
@@ -479,5 +507,115 @@ def serve(
             next_process.wait()
 
 
-if __name__ == "__main__":
+# ── Configuration Commands ───────────────────────────────────────
+
+@app.command()
+def config_show() -> None:
+    """Show current configuration values."""
+    config = get_config()
+    
+    console.print("\n[bold cyan]LedgerScope Configuration[/bold cyan]\n")
+    
+    sections = ["general", "data", "currency", "display", "api_keys"]
+    
+    for section in sections:
+        section_data = config.get_section(section)
+        if section_data:
+            console.print(f"[bold yellow][{section}][/bold yellow]")
+            table = Table(show_header=False, box=None)
+            table.add_column("Key", style="dim")
+            table.add_column("Value")
+            
+            for key, value in section_data.items():
+                # Mask API keys
+                if "key" in key.lower() and value:
+                    display_value = "********" if value else "(not set)"
+                else:
+                    display_value = str(value)
+                table.add_row(f"  {key}", display_value)
+            
+            console.print(table)
+            console.print()
+    
+    config_path = config._config_path
+    console.print(f"[dim]Config file: {config_path}[/dim]")
+    console.print(f"[dim]Log file: {config_path.parent / config.log_file}[/dim]\n")
+
+
+@app.command()
+def config_init() -> None:
+    """Initialize configuration file with defaults."""
+    config = init_config()
+    
+    if config._config_path.exists():
+        console.print(f"[yellow]Configuration file already exists:[/] {config._config_path}")
+        console.print("Edit it manually or use environment variables to override settings.")
+    else:
+        config.create_default_config()
+        console.print(f"[green]✓[/] Created configuration file: {config._config_path}")
+        console.print("\nYou can now edit this file to customize LedgerScope settings.")
+
+
+@app.command()
+def config_set(
+    key: str = typer.Argument(help="Configuration key (e.g., 'general.base_currency')"),
+    value: str = typer.Argument(help="Value to set"),
+) -> None:
+    """Set a configuration value (updates config file)."""
+    import toml
+    
+    config = get_config()
+    config_path = config._config_path
+    
+    if not config_path.exists():
+        console.print("[yellow]Config file doesn't exist. Creating it...[/]")
+        config.create_default_config()
+    
+    # Parse key into section and name
+    if "." not in key:
+        console.print("[red]Error:[/] Key must be in format 'section.key' (e.g., 'general.base_currency')")
+        raise typer.Exit(1)
+    
+    section, key_name = key.split(".", 1)
+    
+    # Load existing config
+    try:
+        with open(config_path, "r") as f:
+            config_data = toml.load(f)
+    except Exception as e:
+        console.print(f"[red]Error loading config:[/] {e}")
+        raise typer.Exit(1)
+    
+    # Update value
+    if section not in config_data:
+        config_data[section] = {}
+    
+    # Try to convert to appropriate type
+    try:
+        if value.lower() in ("true", "false"):
+            config_data[section][key_name] = value.lower() == "true"
+        elif value.replace(".", "", 1).isdigit():
+            config_data[section][key_name] = float(value) if "." in value else int(value)
+        else:
+            config_data[section][key_name] = value
+    except Exception:
+        config_data[section][key_name] = value
+    
+    # Write back
+    try:
+        with open(config_path, "w") as f:
+            toml.dump(config_data, f)
+        console.print(f"[green]✓[/] Updated {key} = {value}")
+        console.print(f"[dim]Restart ledgerscope or reload config to apply changes[/dim]")
+    except Exception as e:
+        console.print(f"[red]Error saving config:[/] {e}")
+        raise typer.Exit(1)
+
+
+def main():
+    """Entry point for the ledgerscope command."""
     app()
+
+
+if __name__ == "__main__":
+    main()

@@ -43,6 +43,9 @@ git clone https://github.com/Aarnav-JP/ledgerscope.git
 cd ledgerscope
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
+
+# Initialize configuration (optional - auto-created on first run)
+ledgerscope config-init
 ```
 
 ### Import Your Trades (30 Seconds)
@@ -73,6 +76,13 @@ ledgerscope report risk --export pdf
 ---
 
 ## ✨ Features
+
+### 🆕 NEW: Enterprise-Grade Features (v0.2.0)
+- **🔧 Configuration Management**: TOML-based config with environment variable overrides
+- **📝 Structured Logging**: File and console logging with Rich formatting
+- **💱 Multi-Currency Support**: Automatic exchange rate fetching and conversion to base currency
+- **🔄 Robust Error Handling**: Automatic retries with exponential backoff for API calls
+
 
 ### 📥 Multi-Broker Data Ingestion
 - **Zerodha**, **Robinhood**, and **Interactive Brokers** parsers with automatic column detection and aliasing

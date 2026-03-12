@@ -8,7 +8,10 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from ledgerscope.config import get_config
+from ledgerscope.currency import CurrencyConverter
 from ledgerscope.db import init_db
+from ledgerscope.logging import get_logger, get_log_path
 from ledgerscope.analytics.risk import (
     get_holdings,
     get_risk_summary,
@@ -19,6 +22,8 @@ from ledgerscope.analytics.risk import (
     get_portfolio_summary,
 )
 from ledgerscope.analytics.backtest import run_backtest
+
+logger = get_logger(__name__)
 
 app = FastAPI(
     title="LedgerScope API",
@@ -173,6 +178,113 @@ def api_summary():
         "portfolio_sharpe": s.portfolio_sharpe,
         "num_holdings": s.num_holdings,
     }
+
+
+# ── Configuration ────────────────────────────────────────────────
+
+@app.get("/api/config")
+def api_config():
+    """Return current configuration (excluding sensitive API keys)."""
+    config = get_config()
+    logger.info("Configuration requested via API")
+    
+    return {
+        "general": {
+            "base_currency": config.base_currency,
+            "risk_free_rate": config.risk_free_rate,
+            "log_level": config.log_level,
+        },
+        "data": {
+            "cache_expiry_days": config.cache_expiry_days,
+            "retry_attempts": config.retry_attempts,
+        },
+        "currency": {
+            "auto_convert": config.auto_convert_currency,
+        },
+        "display": config.get_section("display"),
+    }
+
+
+@app.get("/api/currencies")
+def api_currencies():
+    """Return list of currencies in portfolio and exchange rates."""
+    conn = _get_conn()
+    config = get_config()
+    
+    try:
+        # Check if exchange_rates table exists (read-only mode can't create it)
+        tables = conn.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_name = 'exchange_rates'"
+        ).fetchall()
+        
+        if not tables:
+            # Table doesn't exist, return empty response
+            logger.warning("exchange_rates table does not exist. Run 'ledgerscope ingest' first.")
+            return {
+                "base_currency": config.base_currency,
+                "currencies": [],
+                "exchange_rates": {},
+            }
+        
+        # Get currencies from portfolio
+        currencies_query = conn.execute("""
+            SELECT DISTINCT currency 
+            FROM transactions 
+            WHERE currency IS NOT NULL
+            ORDER BY currency
+        """).fetchall()
+        currencies = [row[0] for row in currencies_query] if currencies_query else []
+        
+        # Get latest exchange rates for each currency
+        rates = {}
+        for currency in currencies:
+            if currency != config.base_currency:
+                try:
+                    rate_query = conn.execute("""
+                        SELECT rate FROM exchange_rates
+                        WHERE from_currency = ? AND to_currency = ?
+                        ORDER BY date DESC LIMIT 1
+                    """, [currency, config.base_currency]).fetchone()
+                    
+                    if rate_query:
+                        rates[currency] = rate_query[0]
+                    else:
+                        rates[currency] = None
+                except Exception as e:
+                    logger.error(f"Error fetching rate for {currency}: {e}")
+                    rates[currency] = None
+        
+        return {
+            "base_currency": config.base_currency,
+            "currencies": currencies,
+            "exchange_rates": rates,
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch currencies: {e}")
+        raise HTTPException(status_code=500, detail=f"Currency fetch error: {e}")
+
+
+@app.get("/api/logs")
+def api_logs(lines: int = Query(100, ge=1, le=1000)):
+    """Return recent log entries."""
+    try:
+        log_path = get_log_path()
+        if not log_path.exists():
+            return {"logs": []}
+        
+        with open(log_path, 'r') as f:
+            all_lines = f.readlines()
+            recent_lines = all_lines[-lines:]
+        
+        return {
+            "log_file": str(log_path),
+            "total_lines": len(all_lines),
+            "returned_lines": len(recent_lines),
+            "logs": [line.strip() for line in recent_lines]
+        }
+    except Exception as e:
+        logger.error(f"Failed to read logs: {e}")
+        raise HTTPException(status_code=500, detail=f"Log read error: {e}")
 
 
 # ── Backtest ─────────────────────────────────────────────────────

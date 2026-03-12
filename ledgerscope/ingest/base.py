@@ -9,6 +9,11 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
+from ledgerscope.errors import DataIngestionError, ValidationError
+from ledgerscope.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 def generate_tx_id(
     broker: str,
@@ -58,23 +63,42 @@ class BrokerParser(ABC):
 
         Returns the number of rows inserted.
         """
-        self.validate(path)
-        df = self.normalize(path)
+        logger.info(f"Processing {self.broker_name} file: {path}")
+        
+        try:
+            self.validate(path)
+        except Exception as e:
+            logger.error(f"Validation failed for {path}: {e}")
+            raise ValidationError(f"Failed to validate {self.broker_name} file") from e
+        
+        try:
+            df = self.normalize(path)
+        except Exception as e:
+            logger.error(f"Normalization failed for {path}: {e}")
+            raise DataIngestionError(f"Failed to normalize {self.broker_name} file") from e
 
         if df.empty:
+            logger.warning(f"No transactions found in {path}")
             return 0
 
-        # Use INSERT OR IGNORE for idempotent inserts
-        # Register the DataFrame as a temporary view and insert
-        conn.register("_staging", df)
-        conn.execute("""
-            INSERT OR IGNORE INTO transactions
-            SELECT
-                id, broker, trade_date, settle_date, symbol, isin,
-                action, quantity, price, fees, currency, exchange,
-                notes, NOW() as imported_at
-            FROM _staging
-        """)
-        conn.unregister("_staging")
+        logger.debug(f"Normalized {len(df)} transactions from {path}")
 
-        return len(df)
+        try:
+            # Use INSERT OR IGNORE for idempotent inserts
+            # Register the DataFrame as a temporary view and insert
+            conn.register("_staging", df)
+            conn.execute("""
+                INSERT OR IGNORE INTO transactions
+                SELECT
+                    id, broker, trade_date, settle_date, symbol, isin,
+                    action, quantity, price, fees, currency, exchange,
+                    notes, NOW() as imported_at
+                FROM _staging
+            """)
+            conn.unregister("_staging")
+            
+            logger.info(f"Successfully inserted {len(df)} transactions from {path}")
+            return len(df)
+        except Exception as e:
+            logger.error(f"Failed to insert transactions into database: {e}")
+            raise DataIngestionError(f"Database insertion failed") from e

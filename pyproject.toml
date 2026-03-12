@@ -24,6 +24,7 @@ classifiers = [
 dependencies = [
     "duckdb>=0.10",
     "pandas>=2.0",
+    "pyarrow>=14.0",
     "typer>=0.12",
     "rich>=13",
     "textual>=0.60",
@@ -34,6 +35,9 @@ dependencies = [
     "weasyprint>=62",
     "jinja2>=3.1",
     "matplotlib>=3.8",
+    "requests>=2.31",
+    "urllib3>=2.0",
+    "toml>=0.10",
 ]
 
 [project.optional-dependencies]
@@ -44,7 +48,7 @@ dev = [
 ]
 
 [project.scripts]
-ledgerscope = "ledgerscope.cli:app"
+ledgerscope = "ledgerscope.cli:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

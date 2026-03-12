@@ -6,7 +6,10 @@ from textual.containers import Container, Horizontal, Vertical
 from textual.widgets import DataTable, Header, Footer, TabbedContent, TabPane, Input
 from textual.binding import Binding
 
+from ledgerscope.config import get_config
+from ledgerscope.currency import CurrencyConverter
 from ledgerscope.db import get_connection
+from ledgerscope.logging import get_logger
 from ledgerscope.analytics.risk import (
     get_portfolio_summary,
     get_risk_summary,
@@ -14,6 +17,8 @@ from ledgerscope.analytics.risk import (
     get_drawdown
 )
 from ledgerscope.tui.widgets import MetricCard, format_currency, format_percentage, get_color_class
+
+logger = get_logger(__name__)
 
 
 class OverviewScreen(Container):
