@@ -33,7 +33,179 @@ You export your trades from Zerodha, Robinhood, or Interactive Brokers, run a si
 
 ---
 
-## 🚀 Quickstart
+## � New to Coding? Start Here!
+
+**No programming experience? No problem!** Follow these simple steps to analyze your investment portfolio like a pro.
+
+### 📋 What You'll Need
+- A computer (Windows, Mac, or Linux)
+- Your brokerage account export (CSV file from Zerodha/Robinhood/Interactive Brokers)
+- 10 minutes of your time
+
+### 🎯 Step-by-Step Guide for Beginners
+
+#### **Step 1: Install Python** (One-time setup)
+<details>
+<summary>📱 <b>Mac Users</b> - Click to expand</summary>
+
+1. Open **Terminal** (press `Cmd + Space`, type "Terminal", press Enter)
+2. Copy and paste this command:
+   ```bash
+   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+   ```
+3. After it finishes, run:
+   ```bash
+   brew install python@3.11
+   ```
+</details>
+
+<details>
+<summary>🪟 <b>Windows Users</b> - Click to expand</summary>
+
+1. Download Python from [python.org/downloads](https://www.python.org/downloads/)
+2. Run the installer
+3. ✅ **Important**: Check "Add Python to PATH" during installation
+4. Click "Install Now"
+</details>
+
+<details>
+<summary>🐧 <b>Linux Users</b> - Click to expand</summary>
+
+```bash
+sudo apt update
+sudo apt install python3.11 python3-pip python3-venv
+```
+</details>
+
+#### **Step 2: Download LedgerScope** (One-time setup)
+
+1. **Option A: Simple Download (No Git needed)**
+   - Go to [github.com/Aarnav-JP/ledgerscope](https://github.com/Aarnav-JP/ledgerscope)
+   - Click the green **"Code"** button → **"Download ZIP"**
+   - Extract the ZIP file to your Desktop
+
+2. **Option B: Using Git (if you have it)**
+   ```bash
+   git clone https://github.com/Aarnav-JP/ledgerscope.git
+   cd ledgerscope
+   ```
+
+#### **Step 3: Install LedgerScope** (One-time setup)
+
+Open Terminal/Command Prompt in the ledgerscope folder and run:
+
+```bash
+# Create a virtual environment (keeps things organized)
+python -m venv .venv
+
+# Activate it
+# For Mac/Linux:
+source .venv/bin/activate
+# For Windows:
+.venv\Scripts\activate
+
+# Install LedgerScope
+pip install -e .
+
+# Run the fix script (Mac/Linux users only, due to a known bug)
+./fix_entrypoint.sh
+```
+
+✅ **You're all set!** You only need to do this once.
+
+#### **Step 4: Import Your Trades** (Every time you want to analyze)
+
+1. **Export your trades from your broker:**
+   - **Zerodha**: Console → Reports → Tradebook → Download CSV
+   - **Robinhood**: Account → Menu → Statements & History → Download
+   - **Interactive Brokers**: Reports → Trade Confirmation → Export CSV
+
+2. **Import into LedgerScope:**
+   ```bash
+   # Activate virtual environment first (if not already active)
+   source .venv/bin/activate   # Mac/Linux
+   .venv\Scripts\activate      # Windows
+
+   # Import your file (replace with your actual file path)
+   ledgerscope ingest zerodha ~/Downloads/tradebook.csv
+   # OR
+   ledgerscope ingest robinhood ~/Downloads/account_activity.csv
+   # OR
+   ledgerscope ingest ibkr ~/Downloads/trades.csv
+   ```
+
+   **What happens now?**
+   - ⚡ LedgerScope reads your trades
+   - 📊 Downloads current stock prices (using Yahoo Finance)
+   - 💾 Saves everything in a local database (no cloud, 100% private!)
+   - ⏱️ Takes ~30-60 seconds
+
+#### **Step 5: View Your Analytics** (Choose your favorite!)
+
+**🌐 Option 1: Beautiful Web Dashboard (Recommended)**
+```bash
+ledgerscope serve
+```
+Then open your browser and go to: **http://localhost:3000**
+
+You'll see:
+- 📈 Interactive charts of your portfolio performance
+- 💰 Profit/Loss breakdown by stock
+- 📊 Risk metrics (Sharpe Ratio, Max Drawdown, Volatility)
+- 🎯 Portfolio comparison vs. S&P 500
+- ⚙️ Settings page for configuration
+
+**💻 Option 2: Terminal Interface (For the minimalists)**
+```bash
+ledgerscope tui
+```
+Navigate with arrow keys, press `q` to quit.
+
+**📄 Option 3: Quick Text Report**
+```bash
+ledgerscope report summary
+```
+Prints a quick overview in your terminal.
+
+**📋 Option 4: Generate PDF Report**
+```bash
+ledgerscope report risk --export pdf
+```
+Creates a professional PDF report in your current folder.
+
+### 🎓 Pro Tips
+
+- **First time using a terminal?** No worries! Just copy-paste the commands exactly as shown.
+- **Data stays private**: Everything runs on YOUR computer. No data is sent to any server.
+- **Re-import anytime**: Download new trades and run the import command again. It won't create duplicates!
+- **Try the examples**: After importing, try `ledgerscope query "SELECT * FROM holdings"` to see your current positions.
+
+### 🆘 Need Help?
+
+- **Error installing?** Make sure Python version is 3.11 or higher: `python --version`
+- **Command not found?** Make sure you activated the virtual environment (Step 3)
+- **Import failed?** Check if your CSV file is from the correct broker format
+- **Something else?** [Open an issue](https://github.com/Aarnav-JP/ledgerscope/issues) with the error message
+
+### 🎉 Success Looks Like This
+
+After running `ledgerscope serve` and opening http://localhost:3000, you should see:
+
+```
+✓ Imported 127 transactions
+✓ Fetched prices for 15 symbols
+✓ Fetched macro data
+
+Starting LedgerScope API server on http://localhost:8000
+Starting Next.js dashboard on http://localhost:3000
+Press Ctrl+C to stop both servers.
+```
+
+**Congratulations!** 🎊 You're now using professional portfolio analytics software that hedge funds pay thousands for!
+
+---
+
+## 🚀 Quickstart (For Developers)
 
 ### Installation
 
