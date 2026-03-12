@@ -79,7 +79,9 @@ class TestViews:
         migrations_dir = Path(__file__).parent.parent / "ledgerscope" / "migrations"
         views_path = Path(__file__).parent.parent / "ledgerscope" / "analytics" / "views.sql"
 
-        db_conn.execute((migrations_dir / "001_initial.sql").read_text())
+        # Apply all migrations
+        for mig_file in sorted(migrations_dir.glob("*.sql")):
+            db_conn.execute(mig_file.read_text())
 
         sql = views_path.read_text()
         for statement in sql.split(";"):
@@ -105,7 +107,10 @@ class TestViews:
         migrations_dir = Path(__file__).parent.parent / "ledgerscope" / "migrations"
         views_path = Path(__file__).parent.parent / "ledgerscope" / "analytics" / "views.sql"
 
-        db_conn.execute((migrations_dir / "001_initial.sql").read_text())
+        # Apply all migrations
+        for mig_file in sorted(migrations_dir.glob("*.sql")):
+            db_conn.execute(mig_file.read_text())
+        
         sql = views_path.read_text()
         for statement in sql.split(";"):
             stmt = statement.strip()
